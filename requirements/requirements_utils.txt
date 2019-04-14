@@ -1,0 +1,12 @@
+# Handy dev utils
+pip
+wheel
+flake8
+pylint
+isort
+bandit
+bumpversion
+twine
+check-manifest
+safety
+black
