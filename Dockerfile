@@ -1,0 +1,19 @@
+FROM python:3
+
+COPY . /code
+WORKDIR /code
+RUN pip install -r requirements.txt && pip install uwsgi
+ARG PORT=80
+EXPOSE $PORT
+ARG WORKERS=4
+ARG THREADS=2
+ARG MASTER=1
+ARG MOUNT=/=wsgi:app
+ENV UWSGI_HTTP=:$PORT \
+    UWSGI_MASTER=$MASTER \
+    UWSGI_THREADS=$THREADS \
+    UWSGI_MOUNT=$MOUNT \
+    UWSGI_WORKERS=$WORKERS \
+    UWSGI_MANAGE_SCRIPT_NAME=1 \
+    UWSGI_STRICT=true
+CMD uwsgi
