@@ -246,7 +246,8 @@ def update_quote(pk, quote_info):
             response_code=422,
         )
     if "author" in new_data:
-        if new_data["author"] != QUOTE_SCHEMA.dump(existing_quote).data["author"]:
+        existing_quote_json = QUOTE_SCHEMA.dump(existing_quote).data
+        if new_data["author"]["name"] != existing_quote_json["author"]["name"]:
             raise Error(
                 error_name="CanNotCreateOrEditAuthorsFromQuoteUpdate",
                 message="Sorry, it looks like you tried to create or "
@@ -258,7 +259,7 @@ def update_quote(pk, quote_info):
     existing_quote.content = new_data["content"]
     db.session.add(existing_quote)
     db.session.commit()
-    return QUOTE_SCHEMA.dumps(existing_quote).data
+    return QUOTE_SCHEMA.dump(existing_quote).data
 
 
 def delete_quote(pk):

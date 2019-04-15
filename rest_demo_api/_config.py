@@ -34,7 +34,7 @@ class Configuration:  # pylint: disable=R0903
         SECRET_KEY = environ.var(_gen_secret_key())
         DEBUG = environ.bool_var(False)
         TESTING = environ.bool_var(False)
-        SQLALCHEMY_DATABASE_URI = environ.var("sqlite:////tmp/test.db")
+        SQLALCHEMY_DATABASE_URI = environ.var("sqlite://")
         SQLALCHEMY_TRACK_MODIFICATIONS = environ.bool_var(False)
 
     flask = environ.group(FlaskConfig)

@@ -137,7 +137,6 @@ class Tests(unittest.TestCase):
             "/authors/{}".format(str(create_resp.json["id"])),
             json={"id": create_resp.json["id"], "name": new_name},
         )
-        print(put_resp.json)
         self.assertEqual(put_resp.status_code, 200)
         get_resp2 = self.client.get("/authors/{}".format(str(create_resp.json["id"])))
         self.assertEqual(put_resp.json, get_resp2.json)
@@ -146,7 +145,25 @@ class Tests(unittest.TestCase):
         pass
 
     def test_update_quote(self):
-        pass
+        create_resp = self.client.post(
+            "/quotes",
+            json={
+                "author": {"name": "Brian {}".format(uuid4().hex)},
+                "content": uuid4().hex,
+            },
+        )
+        self.assertEqual(create_resp.status_code, 200)
+        get_resp = self.client.get("/quotes/{}".format(str(create_resp.json["id"])))
+        self.assertEqual(create_resp.json, get_resp.json)
+        new_content = uuid4().hex
+        update_resp = self.client.put(
+            "/quotes/{}".format(str(create_resp.json["id"])),
+            json={"content": new_content},
+        )
+        self.assertEqual(update_resp.status_code, 200)
+        get_resp2 = self.client.get("/quotes/{}".format(str(create_resp.json["id"])))
+        self.assertEqual(get_resp2.json, update_resp.json)
+        self.assertNotEqual(get_resp.json["content"], get_resp2.json["content"])
 
     def test_cant_update_author_while_updating_quote(self):
         pass

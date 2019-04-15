@@ -17,11 +17,18 @@ class AuthorSchema(Schema):
     quotes = fields.Nested("QuoteSchema", many=True, exclude=("author",))
 
 
+class NestedAuthorSchema(Schema):
+    """Schema for Author objects embedded in quotes."""
+
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True, validate=must_not_be_blank)
+
+
 class QuoteSchema(Schema):
     """Schema for Quote objects."""
 
     id = fields.Int(dump_only=True)
-    author = fields.Nested(AuthorSchema, validate=must_not_be_blank)
+    author = fields.Nested(NestedAuthorSchema, validate=must_not_be_blank)
     content = fields.Str(required=True, validate=must_not_be_blank)
     posted_at = fields.DateTime(dump_only=True)
 
