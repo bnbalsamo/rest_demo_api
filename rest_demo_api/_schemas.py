@@ -14,7 +14,7 @@ class AuthorSchema(Schema):
 
     id = fields.Int(dump_only=True)
     name = fields.Str(required=True, validate=must_not_be_blank)
-    quotes = fields.Nested("QuoteSchema", many=True, exclude=("author",))
+    quotes = fields.Nested("NestedQuoteSchema", many=True, exclude=("author",))
 
 
 class NestedAuthorSchema(Schema):
@@ -29,6 +29,14 @@ class QuoteSchema(Schema):
 
     id = fields.Int(dump_only=True)
     author = fields.Nested(NestedAuthorSchema, validate=must_not_be_blank)
+    content = fields.Str(required=True, validate=must_not_be_blank)
+    posted_at = fields.DateTime(dump_only=True)
+
+
+class NestedQuoteSchema(Schema):
+    """Schema for Quote objects embedded in authors."""
+
+    id = fields.Int(dump_only=True)
     content = fields.Str(required=True, validate=must_not_be_blank)
     posted_at = fields.DateTime(dump_only=True)
 
