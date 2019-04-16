@@ -21,6 +21,26 @@ from .exceptions import Error
 db = get_db()
 
 
+def get_existing(model, pk):
+    """
+    Retrieve an existing instance of a database model by the primary key.
+
+    :param model: The model of the instance to retrieve
+    :param pk: The primary key.
+
+    :returns: The model instance.
+    """
+    try:
+        entity = model.query.get(pk)
+    except IntegrityError:
+        raise Error(
+            error_name="EntityDoesNotExistError",
+            message="Sorry, that entity doesn't exist yet!",
+            response_code=404,
+        )
+    return entity
+
+
 def create_author(author_info):
     """
     Create a new Author.
@@ -32,28 +52,20 @@ def create_author(author_info):
     :returns: The new author entry.
     """
     try:
-        data = AUTHOR_SCHEMA.load(author_info).data
+        author = AUTHOR_SCHEMA.load(author_info).data
     except ValidationError as err:
         raise Error(
             error_name="SchemaValidationError",
             message=json.dumps(err.messages),
             response_code=422,
         )
-    author = Author.query.filter_by(name=data["name"]).first()
-    if author is not None:
+    if Author.query.filter_by(name=author.name).first() is not None:
         raise Error(
             error_name="AuthorAlreadyExistsError",
             message="That author already exists!",
             response_code=400,
         )
-    author = Author(name=data["name"])
     db.session.add(author)
-    if data.get("quotes"):
-        for quote_dict in data["quotes"]:
-            quote = Quote(
-                author=author, content=quote_dict["content"], posted_at=datetime.now()
-            )
-            db.session.add(quote)
     db.session.commit()
     return AUTHOR_SCHEMA.dump(author).data
 
@@ -78,14 +90,7 @@ def read_author(pk):
     :rtype: dict
     :returns: The author entry.
     """
-    try:
-        author = Author.query.get(pk)
-    except IntegrityError:
-        raise Error(
-            error_name="AuthorDoesNotExistError",
-            message="Sorry, that author doesn't exist yet!",
-            response_code=404,
-        )
+    author = get_existing(Author, pk)
     return AUTHOR_SCHEMA.dump(author).data
 
 
@@ -100,37 +105,20 @@ def update_author(pk, author_info):
     :rtype: dict
     :returns: The updated author dictionary
     """
-    try:
-        existing_author = Author.query.get(pk)
-    except IntegrityError:
-        raise Error(
-            error_name="AuthorDoesNotExistError",
-            message="Sorry, that author doesn't exist yet!",
-            response_code=404,
-        )
-    try:
-        new_data = AUTHOR_SCHEMA.load(author_info).data
-    except ValidationError as err:
+    author = get_existing(Author, pk)
+    errors = AUTHOR_SCHEMA.validate(author_info, partial=True)
+    if errors:
         raise Error(
             error_name="SchemaValidationError",
-            message=json.dumps(err.messages),
+            message=json.dumps(errors),
             response_code=422,
         )
-    if new_data.get("quotes"):
-        for quote in new_data["quotes"]:
-            if quote not in AUTHOR_SCHEMA.dump(existing_author).data["quotes"]:
-                raise Error(
-                    error_name="CanNotCreateOrEditQuotesFromAuthorUpdate",
-                    message="Sorry, it looks like you tried to create or "
-                    + "edit a quote while updating an author. You have to use the "
-                    + "quotes endpoint for that!",
-                    response_code=400,
-                )
-        new_data.pop("quotes")
-    existing_author.name = new_data["name"]
-    db.session.add(existing_author)
+    # Update the object
+    for key in author_info:
+        setattr(author, key, author_info[key])
+    db.session.add(author)
     db.session.commit()
-    return AUTHOR_SCHEMA.dump(existing_author).data
+    return AUTHOR_SCHEMA.dump(author).data
 
 
 def delete_author(pk):
@@ -139,15 +127,11 @@ def delete_author(pk):
 
     :param int pk: The primary key of the author to delete
     """
-    try:
-        existing_author = Author.query.get(pk)
-    except IntegrityError:
-        raise Error(
-            error_name="AuthorDoesNotExistError",
-            message="Sorry, that author doesn't exist yet!",
-            response_code=404,
-        )
-    db.session.delete(existing_author)
+    author = get_existing(Author, pk)
+    # TODO: Replace with a cascade in the model?
+    for quote in author.quotes:
+        db.session.delete(quote)
+    db.session.delete(author)
     db.session.commit()
 
 
@@ -162,28 +146,30 @@ def create_quote(quote_info):
     :returns: The new quote entry
     """
     try:
-        data = QUOTE_SCHEMA.load(quote_info).data
+        quote = QUOTE_SCHEMA.load(quote_info).data
     except ValidationError as err:
         raise Error(
             error_name="SchemaValidationError",
             message=json.dumps(err.messages),
             response_code=422,
         )
-    # TODO: Better measure of uniqueness?
-    quote = Quote.query.filter_by(content=data["content"]).first()
-    if quote is not None:
-        raise Error(
-            error_name="QuoteAlreadyExistsError",
-            message="That quote already exists!",
-            response_code=400,
-        )
-    author = Author.query.filter_by(name=data["author"]["name"]).first()
+    author = Author.query.filter_by(name=quote.author.name).first()
     if author is None:
         # Create a new author
-        author = Author(name=data["author"]["name"])
+        author = Author(name=quote.author.name)
         db.session.add(author)
-    quote = Quote
-    quote = Quote(content=data["content"], author=author, posted_at=datetime.now())
+    else:
+        # Prevent quotes with duplicate content under the same author
+        same_quotes = Quote.query.filter_by(
+            author=author, content=quote.content
+        ).first()
+        if same_quotes:
+            raise Error(
+                error_name="QuoteAlreadyExistsError",
+                message="That quote already exists!",
+                response_code=400,
+            )
+    quote.posted_at = datetime.now()
     db.session.add(quote)
     db.session.commit()
     return QUOTE_SCHEMA.dump(quote).data
@@ -208,14 +194,7 @@ def read_quote(pk):
     :rtype: dict
     :returns: The quote entry.
     """
-    try:
-        quote = Quote.query.get(pk)
-    except IntegrityError:
-        raise Error(
-            err_name="QuoteDoesNotExistError",
-            message="Sorry, that quote doesn't exist yet!",
-            response_code=404,
-        )
+    quote = get_existing(Quote, pk)
     return QUOTE_SCHEMA.dump(quote).data
 
 
@@ -229,37 +208,33 @@ def update_quote(pk, quote_info):
     :rtype: dict
     :returns: The updated quote entry.
     """
-    try:
-        existing_quote = Quote.query.get(pk)
-    except IntegrityError:
-        raise Error(
-            error_name="QuoteDoesNotExistError",
-            message="Sorry, that quote doesn't exist yet!",
-            response_code=404,
-        )
-    try:
-        new_data = QUOTE_SCHEMA.load(quote_info).data
-    except ValidationError as err:
+    quote = get_existing(Quote, pk)
+    errors = QUOTE_SCHEMA.validate(quote_info, partial=True)
+    if errors:
         raise Error(
             error_name="SchemaValidationError",
-            message=json.dumps(err.messages),
+            message=json.dumps(errors),
             response_code=422,
         )
-    if "author" in new_data:
-        existing_quote_json = QUOTE_SCHEMA.dump(existing_quote).data
-        if new_data["author"]["name"] != existing_quote_json["author"]["name"]:
-            raise Error(
-                error_name="CanNotCreateOrEditAuthorsFromQuoteUpdate",
-                message="Sorry, it looks like you tried to create or "
-                + "edit an author while updating a quote. You have to use the "
-                + "authors endpoint for that!",
-                response_code=400,
-            )
-        new_data.pop("author")
-    existing_quote.content = new_data["content"]
-    db.session.add(existing_quote)
+    if (
+        quote_info.get("author")  # pylint: disable=C0330
+        and quote_info["author"].get("name")  # pylint: disable=C0330
+        and quote_info["author"]["name"] != quote.author.name  # pylint: disable=C0330
+    ):
+        raise Error(
+            error_name="CanNotCreateOrEditAuthorsFromQuoteUpdate",
+            message="Sorry, it looks like you tried to create or "
+            + "edit an author while updating a quote. You have to use the "
+            + "authors endpoint for that!",
+            response_code=400,
+        )
+    for key in quote_info:
+        if key == "author":
+            continue
+        setattr(quote, key, quote_info[key])
+    db.session.add(quote)
     db.session.commit()
-    return QUOTE_SCHEMA.dump(existing_quote).data
+    return QUOTE_SCHEMA.dump(quote).data
 
 
 def delete_quote(pk):
@@ -268,13 +243,35 @@ def delete_quote(pk):
 
     :param int pk: The primary key of the quote to delete.
     """
-    try:
-        existing_quote = Quote.query.get(pk)
-    except IntegrityError:
-        raise Error(
-            error_name="QuoteDoesNotExistError",
-            message="Sorry, that quote doesn't exist yet!",
-            response_code=404,
-        )
-    db.session.delete(existing_quote)
+    quote = get_existing(Quote, pk)
+    db.session.delete(quote)
     db.session.commit()
+
+
+def create_author_quote(pk, quote_info):
+    """
+    Create a quote with the author implicitly specified.
+
+    :param int pk: The primary key.
+    :param dict quote_info: The information for the quote entry.
+
+    :rtype: dict
+    :returns: The new quote entry
+    """
+    author = get_existing(Author, pk)
+    # Insert the author
+    quote_info["author"] = AUTHOR_SCHEMA.dump(author).data
+    return create_quote(quote_info)
+
+
+def list_author_quotes(pk):
+    """
+    List quotes by a given author.
+
+    :param int pk: The primary key
+
+    :rtype: list[dict]
+    :returns: A list of quotes
+    """
+    author = get_existing(Author, pk)
+    return QUOTES_SCHEMA.dump(author.quotes).data

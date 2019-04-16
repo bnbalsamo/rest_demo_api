@@ -3,13 +3,15 @@
 # pylint: disable=R0201
 
 from flask import Response, jsonify, request
-from flask_restful import Resource
+from flask_restful import Api, Resource
 
 from ._crud import (
     create_author,
+    create_author_quote,
     create_quote,
     delete_author,
     delete_quote,
+    list_author_quotes,
     list_authors,
     list_quotes,
     read_author,
@@ -18,6 +20,51 @@ from ._crud import (
     update_quote,
 )
 from .exceptions import Error
+
+_CACHED_API = None
+
+
+def get_api():
+    """
+    Return the API Object.
+
+    Additionally, handles caching it in the module namespace.
+
+    :returns: The api object
+    """
+    global _CACHED_API  # pylint: disable=W0603
+    if _CACHED_API is not None:
+        return _CACHED_API
+    api = Api()
+    api.add_resource(Root, "/")
+    api.add_resource(Authors, "/authors")
+    api.add_resource(Author, "/authors/<int:pk>")
+    api.add_resource(AuthorQuotes, "/authors/<int:pk>/quotes")
+    api.add_resource(Quotes, "/quotes")
+    api.add_resource(Quote, "/quotes/<int:pk>")
+    api.add_resource(LivenessCheck, "/-/alive")
+    api.add_resource(HealthCheck, "/-/healthy")
+    _CACHED_API = api
+    return api
+
+
+def get_request_json(required=True):
+    """
+    Get the JSON body of a request.
+
+    :param bool required: If true, throw an error if there is no JSON body.
+
+    :rtype: dict
+    :returns: The JSON body of the request
+    """
+    rjson = request.get_json()
+    if not rjson and required:
+        raise Error(
+            error_name="NoDataError",
+            message="You didn't submit any JSON data!",
+            response_code=400,
+        )
+    return rjson
 
 
 class Root(Resource):
@@ -42,7 +89,8 @@ class Authors(Resource):
         :rtype: flask.Response
         """
         # TODO: Pagination?
-        return jsonify(list_authors())
+        author_list = list_authors()
+        return jsonify(author_list)
 
     def post(self):
         """
@@ -50,13 +98,7 @@ class Authors(Resource):
 
         :rtype: flask.Response
         """
-        rjson = request.get_json()
-        if not rjson:
-            raise Error(
-                error_name="NoDataError",
-                message="You didn't submit any JSON data!",
-                response_code=400,
-            )
+        rjson = get_request_json()
         new_author = create_author(rjson)
         return jsonify(new_author)
 
@@ -70,7 +112,8 @@ class Author(Resource):
 
         :rtype: flask.Response
         """
-        return jsonify(read_author(pk))
+        author = read_author(pk)
+        return jsonify(author)
 
     def put(self, pk):
         """
@@ -80,13 +123,7 @@ class Author(Resource):
 
         :rtype: flask.Response
         """
-        rjson = request.get_json()
-        if not rjson:
-            raise Error(
-                error_name="NoDataError",
-                message="You didn't submit any JSON data!",
-                response_code=400,
-            )
+        rjson = get_request_json()
         updated_author = update_author(pk, rjson)
         return jsonify(updated_author)
 
@@ -102,6 +139,35 @@ class Author(Resource):
         return Response(status=204)
 
 
+class AuthorQuotes(Resource):
+    """Quotes endpoint with an implicit author."""
+
+    def get(self, pk):
+        """
+        Get a list of quotes from an author.
+
+        :param int pk: The primary key of the author.
+
+        :rtype: flask.Response
+        :returns: The list of quotes by the provided author.
+        """
+        author_quote_list = list_author_quotes(pk)
+        return jsonify(author_quote_list)
+
+    def post(self, pk):
+        """
+        Create a quote with an implicit author.
+
+        :param int pk: The primary key of the author.
+
+        :rtype: flask.Response
+        :returns: The new quote entry.
+        """
+        rjson = get_request_json()
+        new_author_quote = create_author_quote(pk, rjson)
+        return jsonify(new_author_quote)
+
+
 class Quotes(Resource):
     """Functionality for the Quotes collection."""
 
@@ -112,7 +178,8 @@ class Quotes(Resource):
         :rtype: flask.Response
         """
         # TODO: Pagination?
-        return jsonify(list_quotes())
+        quote_list = list_quotes()
+        return jsonify(quote_list)
 
     def post(self):
         """
@@ -120,13 +187,7 @@ class Quotes(Resource):
 
         :rtype: flask.Response
         """
-        rjson = request.get_json()
-        if not rjson:
-            raise Error(
-                error_name="NoDataError",
-                message="You didn't submit any JSON data!",
-                response_code=400,
-            )
+        rjson = get_request_json()
         new_quote = create_quote(rjson)
         return jsonify(new_quote)
 
@@ -142,25 +203,8 @@ class Quote(Resource):
 
         :rtype: flask.Response
         """
-        return jsonify(read_quote(pk))
-
-    def put(self, pk):
-        """
-        Update a quote entry.
-
-        :param int pk: The primary key of the quote.
-
-        :rtype: flask.Response
-        """
-        rjson = request.get_json()
-        if not rjson:
-            raise Error(
-                error_name="NoDataError",
-                message="You didn't submit any JSON data!",
-                response_code=400,
-            )
-        updated_quote = update_quote(pk, rjson)
-        return jsonify(updated_quote)
+        quote = read_quote(pk)
+        return jsonify(quote)
 
     def delete(self, pk):
         """
@@ -172,6 +216,18 @@ class Quote(Resource):
         """
         delete_quote(pk)
         return Response(status=204)
+
+    def put(self, pk):
+        """
+        Update a quote.
+
+        :paran int pk: The primary key of the quote.
+
+        :rtype: flask.Response
+        """
+        rjson = get_request_json()
+        updated_quote = update_quote(pk, rjson)
+        return jsonify(updated_quote)
 
 
 class LivenessCheck(Resource):

@@ -8,11 +8,10 @@ import logging
 
 import attr
 from flask import Flask, jsonify
-from flask_restful import Api
 
+from ._api import get_api
 from ._config import get_config
 from ._db import get_db
-from ._endpoints import Author, Authors, HealthCheck, LivenessCheck, Quote, Quotes, Root
 from .exceptions import Error
 
 _CACHED_APP = None
@@ -57,14 +56,8 @@ def get_app(config=None):
         database.create_all()
 
     # Init API
-    api = Api(app_instance)
-    api.add_resource(Root, "/")
-    api.add_resource(Authors, "/authors")
-    api.add_resource(Author, "/authors/<int:pk>")
-    api.add_resource(Quotes, "/quotes")
-    api.add_resource(Quote, "/quotes/<int:pk>")
-    api.add_resource(LivenessCheck, "/-/alive")
-    api.add_resource(HealthCheck, "/-/healthy")
+    api = get_api()
+    api.init_app(app_instance)
 
     # Configure Logging
     logging.basicConfig(level=config.verbosity)
