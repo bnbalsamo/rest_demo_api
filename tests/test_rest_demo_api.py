@@ -46,7 +46,7 @@ class Tests(unittest.TestCase):
         create_resp = self.client.post(
             "/authors", json={"name": "Brian {}".format(uuid4().hex)}
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         get_resp = self.client.get("/authors/{}".format(str(create_resp.json["id"])))
         self.assertEqual(create_resp.json, get_resp.json)
         return get_resp.json
@@ -58,13 +58,13 @@ class Tests(unittest.TestCase):
         get_resp = self.client.get("/authors")
         for author in authors:
             list_json = {x: author[x] for x in author_list_json_keys}
-            self.assertTrue(list_json in get_resp.json)
+            self.assertTrue(list_json in get_resp.json["items"])
 
     def test_update_author(self):
         create_resp = self.client.post(
             "/authors", json={"name": "Brian {}".format(uuid4().hex)}
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         get_resp = self.client.get("/authors/{}".format(str(create_resp.json["id"])))
         self.assertEqual(create_resp.json, get_resp.json)
         new_name = create_resp.json["name"] + uuid4().hex
@@ -82,13 +82,15 @@ class Tests(unittest.TestCase):
         del_resp = self.client.delete("/authors/{}".format(str(author["id"])))
         self.assertEqual(del_resp.status_code, 204)
         get_resp2 = self.client.get("/authors")
-        self.assertTrue(author not in get_resp2.json)
+        self.assertTrue(
+            author["name"] not in [x["name"] for x in get_resp2.json["items"]]
+        )
 
     def test_add_quote_with_existing_author(self):
         create_resp = self.client.post(
             "/authors", json={"name": "Brian {}".format(uuid4().hex)}
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         create_resp = self.client.post(
             "/quotes",
             json={
@@ -99,7 +101,7 @@ class Tests(unittest.TestCase):
                 "content": uuid4().hex,
             },
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         get_resp = self.client.get("/quotes/{}".format(str(create_resp.json["id"])))
         self.assertEqual(create_resp.json, get_resp.json)
         return create_resp.json
@@ -112,7 +114,7 @@ class Tests(unittest.TestCase):
                 "content": uuid4().hex,
             },
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         get_resp = self.client.get("/quotes/{}".format(str(create_resp.json["id"])))
         self.assertEqual(create_resp.json, get_resp.json)
         get_author_resp = self.client.get(
@@ -128,7 +130,7 @@ class Tests(unittest.TestCase):
         get_resp = self.client.get("/quotes")
         for quote in quotes:
             list_json = {x: quote[x] for x in quote_list_json_keys}
-            self.assertTrue(list_json in get_resp.json)
+            self.assertTrue(list_json in get_resp.json["items"])
 
     def test_update_quote(self):
         create_resp = self.client.post(
@@ -138,7 +140,7 @@ class Tests(unittest.TestCase):
                 "content": uuid4().hex,
             },
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         get_resp = self.client.get("/quotes/{}".format(str(create_resp.json["id"])))
         self.assertEqual(create_resp.json, get_resp.json)
         new_content = uuid4().hex
@@ -158,12 +160,12 @@ class Tests(unittest.TestCase):
         create_resp = self.client.post(
             "/quotes", json={"content": uuid4().hex, "author": {"name": uuid4().hex}}
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
         del_resp = self.client.delete("/quotes/{}".format(str(create_resp.json["id"])))
         self.assertEqual(del_resp.status_code, 204)
         self.assertTrue(
             create_resp.json["id"]
-            not in [x["id"] for x in self.client.get("/quotes").json]
+            not in [x["id"] for x in self.client.get("/quotes").json["items"]]
         )
 
     def test_list_author_quotes(self):
@@ -174,8 +176,10 @@ class Tests(unittest.TestCase):
             "/authors/{}/quotes".format(quotes[0]["author"]["id"])
         )
         # Quotes are author specific, we only see one
-        self.assertEqual(len(author_quote_resp.json), 1)
-        self.assertEqual(author_quote_resp.json[0]["content"], quotes[0]["content"])
+        self.assertEqual(len(author_quote_resp.json["items"]), 1)
+        self.assertEqual(
+            author_quote_resp.json["items"][0]["content"], quotes[0]["content"]
+        )
 
     def test_create_author_quote(self):
         author_json = self.test_add_author()
@@ -183,7 +187,13 @@ class Tests(unittest.TestCase):
             "/authors/{}/quotes".format(str(author_json["id"])),
             json={"content": uuid4().hex},
         )
-        self.assertEqual(create_resp.status_code, 200)
+        self.assertEqual(create_resp.status_code, 201)
+
+    def test_partial_update_author(self):
+        pass
+
+    def test_partial_update_quote(self):
+        pass
 
     def test_cant_update_author_while_updating_quote(self):
         pass
@@ -221,10 +231,10 @@ class Tests(unittest.TestCase):
     def test_deleting_an_author_deletes_their_quotes(self):
         pass
 
-    def test_partial_update_quote(self):
+    def test_spec_endpoint(self):
         pass
 
-    def test_partial_update_author(self):
+    def test_docs_endpoint(self):
         pass
 
 

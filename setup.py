@@ -11,6 +11,8 @@ URL = 'https://github.com/bnbalsamo/rest_demo_api'
 PYTHON_REQUIRES= ">=3"
 INSTALL_REQUIRES = [
     "aniso8601==6.0.0",
+    "apispec==1.2.1",
+    "apispec-webframeworks==0.4.0",
     "attrs==19.1.0",
     "Click==7.0",
     "environ-config==18.2.0",

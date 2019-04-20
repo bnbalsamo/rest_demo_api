@@ -7,15 +7,13 @@ Update
 Destroy
 """
 
-import json
 from datetime import datetime
 
 from marshmallow.exceptions import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from ._db import get_db
-from ._models import Author, Quote
-from ._schemas import AUTHOR_SCHEMA, AUTHORS_SCHEMA, QUOTE_SCHEMA, QUOTES_SCHEMA
+from ._db import Author, Quote, get_db
+from ._schemas import AUTHOR_SCHEMA, QUOTE_SCHEMA
 from .exceptions import Error
 
 db = get_db()
@@ -30,14 +28,17 @@ def get_existing(model, pk):
 
     :returns: The model instance.
     """
+    err = Error(
+        error_name="EntityDoesNotExistError",
+        message="Sorry, that entity doesn't exist yet!",
+        response_code=404,
+    )
     try:
         entity = model.query.get(pk)
     except IntegrityError:
-        raise Error(
-            error_name="EntityDoesNotExistError",
-            message="Sorry, that entity doesn't exist yet!",
-            response_code=404,
-        )
+        raise err
+    if not entity:
+        raise err
     return entity
 
 
@@ -52,33 +53,42 @@ def create_author(author_info):
     :returns: The new author entry.
     """
     try:
-        author = AUTHOR_SCHEMA.load(author_info).data
+        author_data = AUTHOR_SCHEMA.load(author_info).data
     except ValidationError as err:
         raise Error(
-            error_name="SchemaValidationError",
-            message=json.dumps(err.messages),
-            response_code=422,
+            error_name="SchemaValidationError", message=err.messages, response_code=422
         )
-    if Author.query.filter_by(name=author.name).first() is not None:
+    if Author.query.filter_by(name=author_data["name"]).first() is not None:
         raise Error(
             error_name="AuthorAlreadyExistsError",
             message="That author already exists!",
             response_code=400,
         )
+    author = Author(**author_data)
+    author.posted_at = datetime.now()
     db.session.add(author)
     db.session.commit()
-    return AUTHOR_SCHEMA.dump(author).data
+    return author
 
 
-def list_authors():
+def get_total_number_of_authors():
+    """
+    Get the total number of author entries in the DB.
+
+    :rtype: int
+    """
+    return Author.query.count()
+
+
+def list_authors(limit=50, offset=0):
     """
     List all existing authors.
 
     :rtype: list[dict]
     :returns: A list of all existing authors.
     """
-    authors = Author.query.all()
-    return AUTHORS_SCHEMA.dump(authors).data
+    authors = Author.query.offset(offset).limit(limit).all()
+    return authors
 
 
 def read_author(pk):
@@ -91,34 +101,35 @@ def read_author(pk):
     :returns: The author entry.
     """
     author = get_existing(Author, pk)
-    return AUTHOR_SCHEMA.dump(author).data
+    return author
 
 
-def update_author(pk, author_info):
+def update_author(pk, author_info, partial=False):
     """
     Update an existing author.
 
     :param int pk: The primary key of the author's db entry.
     :param dict author_info: The information to use to update
         the author
+    :param bool partial: Whether or not support partial validation.
 
     :rtype: dict
     :returns: The updated author dictionary
     """
     author = get_existing(Author, pk)
-    errors = AUTHOR_SCHEMA.validate(author_info, partial=True)
-    if errors:
+    try:
+        author_data = AUTHOR_SCHEMA.load(author_info, partial=partial).data
+    except ValidationError as err:
         raise Error(
-            error_name="SchemaValidationError",
-            message=json.dumps(errors),
-            response_code=422,
+            error_name="SchemaValidationError", message=err.messages, response_code=422
         )
     # Update the object
-    for key in author_info:
-        setattr(author, key, author_info[key])
+    for key in author_data:
+        setattr(author, key, author_data[key])
+    author.updated_at = datetime.now()
     db.session.add(author)
     db.session.commit()
-    return AUTHOR_SCHEMA.dump(author).data
+    return author
 
 
 def delete_author(pk):
@@ -146,44 +157,57 @@ def create_quote(quote_info):
     :returns: The new quote entry
     """
     try:
-        quote = QUOTE_SCHEMA.load(quote_info).data
+        quote_data = QUOTE_SCHEMA.load(quote_info).data
     except ValidationError as err:
         raise Error(
-            error_name="SchemaValidationError",
-            message=json.dumps(err.messages),
-            response_code=422,
+            error_name="SchemaValidationError", message=err.messages, response_code=422
         )
-    author = Author.query.filter_by(name=quote.author.name).first()
+    # Intelligently handle dynamically adding the author if required.
+    author = Author.query.filter(Author.name == quote_data["author"]["name"]).first()
     if author is None:
-        # Create a new author
-        author = Author(name=quote.author.name)
-        db.session.add(author)
+        author = create_author(quote_info["author"])
     else:
-        # Prevent quotes with duplicate content under the same author
-        same_quotes = Quote.query.filter_by(
-            author=author, content=quote.content
-        ).first()
-        if same_quotes:
+        # If the author already exists check the quote is unique
+        # in _that author's_ list of quotes.
+        if (
+            Quote.query.join(Author)
+            .filter(Quote.content == quote_data["content"])
+            .filter(Author.name == author.name)
+            .first()
+        ):
             raise Error(
                 error_name="QuoteAlreadyExistsError",
                 message="That quote already exists!",
                 response_code=400,
             )
+    # Inject the Author DB object into the data to prep
+    # for creating the Quote DB object...
+    quote_data["author"] = author
+    quote = Quote(**quote_data)
     quote.posted_at = datetime.now()
     db.session.add(quote)
     db.session.commit()
-    return QUOTE_SCHEMA.dump(quote).data
+    return quote
 
 
-def list_quotes():
+def get_total_number_of_quotes():
+    """
+    Get the total number of quote entries in the DB.
+
+    :rtype: int
+    """
+    return Author.query.count()
+
+
+def list_quotes(limit=50, offset=0):
     """
     List all existing quotes.
 
     :rtype: list[dict]
     :returns: A list of all the quotes.
     """
-    quotes = Quote.query.all()
-    return QUOTES_SCHEMA.dump(quotes).data
+    quotes = Quote.query.offset(offset).limit(limit).all()
+    return quotes
 
 
 def read_quote(pk):
@@ -195,31 +219,31 @@ def read_quote(pk):
     :returns: The quote entry.
     """
     quote = get_existing(Quote, pk)
-    return QUOTE_SCHEMA.dump(quote).data
+    return quote
 
 
-def update_quote(pk, quote_info):
+def update_quote(pk, quote_info, partial=False):
     """
     Update a quote.
 
     :param int pk: The primary key of the quote to update.
     :param dict quote_info: Information to use to update the quote entry.
+    :param bool partial: Whether or not support partial validation.
 
     :rtype: dict
     :returns: The updated quote entry.
     """
     quote = get_existing(Quote, pk)
-    errors = QUOTE_SCHEMA.validate(quote_info, partial=True)
-    if errors:
+    try:
+        quote_data = QUOTE_SCHEMA.load(quote_info, partial=partial).data
+    except ValidationError as err:
         raise Error(
-            error_name="SchemaValidationError",
-            message=json.dumps(errors),
-            response_code=422,
+            error_name="SchemaValidationError", message=err.messages, response_code=422
         )
     if (
-        quote_info.get("author")  # pylint: disable=C0330
-        and quote_info["author"].get("name")  # pylint: disable=C0330
-        and quote_info["author"]["name"] != quote.author.name  # pylint: disable=C0330
+        quote_data.get("author")  # pylint: disable=C0330
+        and quote_data["author"].get("name")  # pylint: disable=C0330
+        and quote_data["author"]["name"] != quote.author.name  # pylint: disable=C0330
     ):
         raise Error(
             error_name="CanNotCreateOrEditAuthorsFromQuoteUpdate",
@@ -231,10 +255,11 @@ def update_quote(pk, quote_info):
     for key in quote_info:
         if key == "author":
             continue
-        setattr(quote, key, quote_info[key])
+        setattr(quote, key, quote_data[key])
+    quote.updated_at = datetime.now()
     db.session.add(quote)
     db.session.commit()
-    return QUOTE_SCHEMA.dump(quote).data
+    return quote
 
 
 def delete_quote(pk):
@@ -264,7 +289,17 @@ def create_author_quote(pk, quote_info):
     return create_quote(quote_info)
 
 
-def list_author_quotes(pk):
+def get_total_number_of_author_quotes(pk):
+    """
+    Get the total number of quotes for this author in the DB.
+
+    :rtype: int
+    """
+    author = get_existing(Author, pk)
+    return Quote.query.join(Author).filter(Author.id == author.id).count()
+
+
+def list_author_quotes(pk, limit=50, offset=0):
     """
     List quotes by a given author.
 
@@ -274,4 +309,11 @@ def list_author_quotes(pk):
     :returns: A list of quotes
     """
     author = get_existing(Author, pk)
-    return QUOTES_SCHEMA.dump(author.quotes).data
+    quotes = (
+        Quote.query.join(Author)
+        .filter(Author.id == author.id)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return quotes

@@ -29,5 +29,13 @@ section.
 - ```cp .tox/requirements.txt .```
 - Copy pinned requirements into ```setup.py```
 
+
+## Generate Local Docs
+
+```bash
+$ python generate_spec.py > spec.json
+$ firefox docs_preview.html
+```
+
 # Author
 Brian Balsamo <Brian@BrianBalsamo.com>

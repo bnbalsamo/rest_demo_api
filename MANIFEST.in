@@ -1,0 +1,2 @@
+include LICENSE
+include rest_demo_api/templates/*.html

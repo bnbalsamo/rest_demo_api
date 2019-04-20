@@ -57,6 +57,10 @@ def get_app(config=None):
 
     # Init API
     api = get_api()
+    # Kind of hacky, but otherwise flask-restful steps
+    # on some toes while handling errors and doesn't provide
+    # a great interface to force it to get out of the way.
+    api.handle_error = _handle_errors
     api.init_app(app_instance)
 
     # Configure Logging
