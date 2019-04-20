@@ -19,7 +19,6 @@ def get_spec():
         plugins=[FlaskPlugin(), MarshmallowPlugin()],
     )
 
-    spec.components.schema("MiniAuthor", schema="MiniAuthorSchema")
     app = get_app()
     # Useful for debugging
     # print(app.view_functions)

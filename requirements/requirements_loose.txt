@@ -7,3 +7,4 @@ attrs
 environ_config
 apispec
 apispec-webframeworks
+pyyaml

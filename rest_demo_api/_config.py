@@ -38,6 +38,7 @@ class Configuration:  # pylint: disable=R0903
         SQLALCHEMY_TRACK_MODIFICATIONS = environ.bool_var(False)
 
     flask = environ.group(FlaskConfig)
+    skip_db_setup = environ.bool_var(False)
     verbosity = environ.var(
         "WARNING", validator=in_(["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"])
     )

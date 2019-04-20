@@ -24,6 +24,7 @@ INSTALL_REQUIRES = [
     "MarkupSafe==1.1.1",
     "marshmallow==2.19.2",
     "pytz==2019.1",
+    "PyYAML==5.1",
     "six==1.12.0",
     "SQLAlchemy==1.3.2",
     "Werkzeug==0.15.2"

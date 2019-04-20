@@ -52,8 +52,9 @@ def get_app(config=None):
     # Init DB
     database = get_db()
     database.init_app(app_instance)
-    with app_instance.app_context():
-        database.create_all()
+    if not config.skip_db_setup:
+        with app_instance.app_context():
+            database.create_all()
 
     # Init API
     api = get_api()

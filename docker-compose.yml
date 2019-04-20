@@ -1,0 +1,10 @@
+version: "2.0"
+services:
+    demo-api:
+        build:
+            context: .
+        ports:
+            - 5000:80
+        restart: always
+        environment:
+            REST_DEMO_API_FLASK_SQLALCHEMY_DATABASE_URI: sqlite:////tmp/demo.db
