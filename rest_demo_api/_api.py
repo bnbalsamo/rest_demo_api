@@ -49,8 +49,8 @@ def get_api():
     api.add_resource(Quote, "/quotes/<int:pk>")
     api.add_resource(LivenessCheck, "/-/alive")
     api.add_resource(HealthCheck, "/-/healthy")
-    api.add_resource(Docs, "/-/docs")
-    api.add_resource(Spec, "/-/spec")
+    api.add_resource(Docs, "/docs")
+    api.add_resource(Spec, "/spec")
     _CACHED_API = api
     return api
 
@@ -646,7 +646,7 @@ class Docs(Resource):
 
     def get(self):
         """Get the docs."""
-        resp = Response(render_template("docs.html", docs_url="/-/spec"))
+        resp = Response(render_template("docs.html", docs_url=get_api().url_for(Spec)))
         resp.mimetype = "text/html"
         return resp
 
