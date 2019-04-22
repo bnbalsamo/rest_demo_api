@@ -381,7 +381,7 @@ class AuthorQuotes(Resource):
             required: true
             content:
                 application/json:
-                    schema: QuoteSchema
+                    schema: QuoteWithImpliedAuthorSchema
         responses:
             201:
                 description: The quote was created.

@@ -94,6 +94,32 @@ class QuoteSchema(Schema):
         return api.url_for(QuoteEndpoint, pk=quote.id)
 
 
+# Required for auto-documentation.
+class QuoteWithImpliedAuthorSchema(Schema):
+    """Schema for Quote objects with an implied Author."""
+
+    class Meta:  # pylint: disable=C0111,R0903
+        """Inner Config class."""
+
+        strict = True
+
+    id = fields.Int(dump_only=True)
+    content = fields.Str(required=True, validate=must_not_be_blank)
+    posted_at = fields.DateTime(dump_only=True)
+    url = fields.Method("get_url", dump_only=True)
+    updated_at = fields.DateTime(dump_only=True)
+    context = fields.Str()
+
+    def get_url(self, quote):  # pylint: disable=R0201
+        """Produce the URL for the Quote."""
+        # Bit of weirdness to avoid a cyclic import...
+        from ._api import get_api
+        from ._api import Quote as QuoteEndpoint
+
+        api = get_api()
+        return api.url_for(QuoteEndpoint, pk=quote.id)
+
+
 class MiniQuoteSchema(Schema):
     """Schema for embbeded or listed Quote objects."""
 
