@@ -196,7 +196,7 @@ def get_total_number_of_quotes():
 
     :rtype: int
     """
-    return Author.query.count()
+    return Quote.query.count()
 
 
 def list_quotes(limit=50, offset=0):
