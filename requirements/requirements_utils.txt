@@ -2,7 +2,7 @@
 pip
 wheel
 flake8
-pylint
+pylint==3.0.3
 isort
 bandit
 bumpversion
