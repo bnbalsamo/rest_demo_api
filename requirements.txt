@@ -1,6 +1,6 @@
 # Pinned on 2019-04-20
 aniso8601==6.0.0
-apispec==1.2.1
+apispec==6.4.0
 apispec-webframeworks==0.4.0
 attrs==19.1.0
 Click==7.0
