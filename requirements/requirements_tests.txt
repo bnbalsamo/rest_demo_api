@@ -1,5 +1,5 @@
 # Tests
-tox
+tox==4.12.1
 tox-pyenv
 pytest
 pytest-cov
