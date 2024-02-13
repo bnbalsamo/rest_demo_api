@@ -1,5 +1,5 @@
 # Handy dev utils
-pip
+pip==24.0
 wheel
 flake8
 pylint
