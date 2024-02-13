@@ -1,5 +1,5 @@
 # Pinned on 2019-04-20
-aniso8601==6.0.0
+aniso8601==9.0.1
 apispec==1.2.1
 apispec-webframeworks==0.4.0
 attrs==19.1.0
