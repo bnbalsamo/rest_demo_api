@@ -10,7 +10,7 @@ Flask-RESTful==0.3.7
 Flask-SQLAlchemy==2.3.2
 itsdangerous==1.1.0
 Jinja2==2.10.1
-MarkupSafe==1.1.1
+MarkupSafe==2.1.5
 marshmallow==2.19.2
 pytz==2019.1
 PyYAML==5.1
