@@ -1,6 +1,6 @@
 # Handy dev utils
 pip
-wheel
+wheel==0.42.0
 flake8
 pylint
 isort
